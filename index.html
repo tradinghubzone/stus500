@@ -251,6 +251,7 @@
         }
 
         .buy-color { color: #00ffcc; }
+        .sell-color { color: #ff3366; }
         .neutral-color { color: #f0f3f6; }
 
         .controls {
@@ -353,7 +354,7 @@
             </div>
 
             <div class="footer-note">
-                Saves state automatically. Won't reset or change when reloaded until TP or SL is hit.
+                Scans for Buy/Sell setups. Locks trade targeting 200 pips until TP or SL hits.
             </div>
         </div>
     </div>
@@ -401,8 +402,9 @@
             }
         }
 
-        // Persistent State Loading from Phone Memory
+        // Persistent State Loading
         let inPosition = localStorage.getItem('us500_inPosition') === 'true';
+        let tradeType = localStorage.getItem('us500_tradeType') || 'BUY'; // 'BUY' or 'SELL'
         let livePrice = parseFloat(localStorage.getItem('us500_livePrice')) || 7679.24;
         let lockedEntry = parseFloat(localStorage.getItem('us500_lockedEntry')) || 0.00;
         let stopLoss = parseFloat(localStorage.getItem('us500_stopLoss')) || 0.00;
@@ -431,7 +433,7 @@
         setInterval(updateMT5Countdown, 1000);
         updateMT5Countdown();
 
-        // Live Price Ticker & Strict Boundary Checker
+        // Live Price Ticker & Strict Boundary Checker for Both Buy and Sell
         setInterval(() => {
             let fluctuation = (Math.random() * 2 - 1).toFixed(2);
             livePrice = parseFloat((livePrice + parseFloat(fluctuation)).toFixed(2));
@@ -441,18 +443,31 @@
             if (priceEl) priceEl.innerText = livePrice.toLocaleString();
 
             if (inPosition) {
-                if (livePrice >= lockedEntry) {
+                let inProfit = false;
+                if (tradeType === 'BUY') {
+                    inProfit = livePrice >= lockedEntry;
+                    if (livePrice >= takeProfit) {
+                        playPipSound(true);
+                        triggerClose("🎯 200-PIP BUY TAKE PROFIT HIT! Scan unlocked.");
+                    } else if (livePrice <= stopLoss) {
+                        playPipSound(false);
+                        triggerClose("🛑 BUY STOP LOSS HIT! Scan unlocked.");
+                    }
+                } else { // SELL trade
+                    inProfit = livePrice <= lockedEntry;
+                    if (livePrice <= takeProfit) {
+                        playPipSound(true);
+                        triggerClose("🎯 200-PIP SELL TAKE PROFIT HIT! Scan unlocked.");
+                    } else if (livePrice >= stopLoss) {
+                        playPipSound(false);
+                        triggerClose("🛑 SELL STOP LOSS HIT! Scan unlocked.");
+                    }
+                }
+
+                if (inProfit) {
                     creature.classList.add('happy'); 
                 } else {
                     creature.classList.remove('happy');
-                }
-
-                if (livePrice >= takeProfit) {
-                    playPipSound(true);
-                    triggerClose("🎯 200-PIP TAKE PROFIT HIT! Scan unlocked.");
-                } else if (livePrice <= stopLoss) {
-                    playPipSound(false);
-                    triggerClose("🛑 STOP LOSS HIT! Scan unlocked.");
                 }
             }
         }, 2000);
@@ -462,11 +477,21 @@
 
             inPosition = true;
             lockedEntry = livePrice;
-            stopLoss = parseFloat((lockedEntry - 40.00).toFixed(2));     
-            takeProfit = parseFloat((lockedEntry + 200.00).toFixed(2));  
+            
+            // Randomly scan for Buy (Long) or Sell (Short) setup
+            tradeType = Math.random() > 0.5 ? 'BUY' : 'SELL';
 
-            // Save state to local memory so reloading won't clear it
+            if (tradeType === 'BUY') {
+                stopLoss = parseFloat((lockedEntry - 40.00).toFixed(2));     
+                takeProfit = parseFloat((lockedEntry + 200.00).toFixed(2));  
+            } else {
+                stopLoss = parseFloat((lockedEntry + 40.00).toFixed(2));     
+                takeProfit = parseFloat((lockedEntry - 200.00).toFixed(2));  
+            }
+
+            // Save state to local memory
             localStorage.setItem('us500_inPosition', 'true');
+            localStorage.setItem('us500_tradeType', tradeType);
             localStorage.setItem('us500_lockedEntry', lockedEntry);
             localStorage.setItem('us500_stopLoss', stopLoss);
             localStorage.setItem('us500_takeProfit', takeProfit);
@@ -477,28 +502,34 @@
         function applyLockedUI() {
             let scanBtn = document.getElementById('scan-btn');
             scanBtn.disabled = true;
-            scanBtn.innerText = "200-PIP TARGET LOCKED (HOLDING)";
+            scanBtn.innerText = "200-PIP " + tradeType + " LOCKED (HOLDING)";
 
             let banner = document.getElementById('status-banner');
             banner.className = "status-banner status-holding";
-            banner.children[0].innerText = "Status: 200-PIP TARGET LOCKED";
-            document.getElementById('state-badge').innerText = "HOLDING 200 PIPS";
+            banner.children[0].innerText = "Status: 200-PIP " + tradeType + " LOCKED";
+            document.getElementById('state-badge').innerText = "HOLDING " + tradeType;
 
             document.getElementById('entry-value').innerText = lockedEntry.toLocaleString();
             document.getElementById('sl-value').innerText = stopLoss.toLocaleString();
             document.getElementById('tp-value').innerText = takeProfit.toLocaleString();
 
             let signalBox = document.getElementById('signal-display');
-            signalBox.className = "signal-action buy-color";
-            signalBox.innerText = "HOLD LONG (Targeting +200 Pips)";
+            if (tradeType === 'BUY') {
+                signalBox.className = "signal-action buy-color";
+                signalBox.innerText = "HOLD LONG (Targeting +200 Pips)";
+            } else {
+                signalBox.className = "signal-action sell-color";
+                signalBox.innerText = "HOLD SHORT (Targeting +200 Pips)";
+            }
         }
 
         function triggerClose(message) {
             inPosition = false;
             creature.classList.remove('happy');
 
-            // Clear memory storage so fresh scan is ready
+            // Clear memory storage for fresh scan
             localStorage.removeItem('us500_inPosition');
+            localStorage.removeItem('us500_tradeType');
             localStorage.removeItem('us500_lockedEntry');
             localStorage.removeItem('us500_stopLoss');
             localStorage.removeItem('us500_takeProfit');

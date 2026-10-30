@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US500 200-Pip AI Sniper Bot (1H)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #020617;
+            color: #f0f3f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* --- BACKGROUND ANIMATION --- */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #02203c 0%, #081226 50%, #030712 100%);
+            z-index: -3;
+        }
+
+        .floating-emoji {
+            position: fixed;
+            font-size: 22px;
+            pointer-events: none;
+            animation: floatEmoji 7s infinite linear;
+            z-index: -2;
+            opacity: 0.7;
+        }
+
+        @keyframes floatEmoji {
+            0% { transform: translateY(105vh) rotate(0deg); opacity: 0; }
+            20% { opacity: 0.8; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+        }
+
+        .neon-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.35;
+            z-index: -2;
+        }
+        .orb-1 { width: 300px; height: 300px; background: #00bfff; top: -50px; left: -50px; }
+        .orb-2 { width: 350px; height: 350px; background: #ff3366; bottom: -50px; right: -50px; }
+
+        /* --- PEEKING CREATURE --- */
+        .peeking-creature {
+            position: fixed;
+            bottom: 0;
+            right: 20px;
+            width: 90px;
+            height: 90px;
+            background: radial-gradient(circle at 50% 35%, #ff9800, #d84315);
+            border-radius: 50% 50% 0 0;
+            box-shadow: 0 0 20px rgba(255, 152, 0, 0.4);
+            z-index: 10;
+            transition: transform 0.3s ease;
+        }
+        
+        .peeking-creature.happy {
+            animation: happyBounce 0.6s infinite alternate ease-in-out;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.7);
+            background: radial-gradient(circle at 50% 35%, #00ffcc, #009975);
+        }
+
+        @keyframes happyBounce {
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(-10px) scale(1.05); }
+        }
+
+        .creature-eye {
+            position: absolute;
+            background: #ffffff;
+            border-radius: 50%;
+            width: 30px;
+            height: 35px;
+            top: 20px;
+            transition: height 0.1s;
+        }
+        .eye-l { left: 12px; }
+        .eye-r { right: 12px; }
+
+        .peeking-creature.blinking .creature-eye {
+            height: 4px;
+            top: 35px;
+        }
+
+        .creature-pupil {
+            position: absolute;
+            background: #000;
+            border-radius: 50%;
+            width: 12px;
+            height: 15px;
+            top: 8px;
+            left: 9px;
+        }
+
+        .creature-smile {
+            position: absolute;
+            width: 30px;
+            height: 15px;
+            border-bottom: 3px solid #000;
+            border-radius: 0 0 20px 20px;
+            bottom: 20px;
+            left: 30px;
+            display: none;
+        }
+        .peeking-creature.happy .creature-smile { display: block; }
+        .peeking-creature.happy .creature-pupil { display: none; }
+
+        /* --- TERMINAL CONTAINER --- */
+        .terminal-container {
+            width: 92%;
+            max-width: 620px;
+            background-color: rgba(12, 18, 32, 0.92);
+            border: 1px solid rgba(0, 191, 255, 0.4);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+            z-index: 5;
+            margin: 20px 0;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #101c30, #172a48);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 191, 255, 0.3);
+        }
+
+        .header h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .mt5-timer-box {
+            background: rgba(0, 191, 255, 0.15);
+            border: 1px solid #00bfff;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #33d6ff;
+            font-weight: bold;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .status-banner {
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-scanning {
+            background: rgba(255, 170, 0, 0.15);
+            border: 1px solid #ffaa00;
+            color: #ffcc00;
+        }
+
+        .status-holding {
+            background: rgba(0, 255, 204, 0.15);
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+        }
+
+        .main-price-card {
+            background: rgba(0, 191, 255, 0.08);
+            border: 1px solid #00bfff;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: #9598a1;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .grid-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .metric-card {
+            background: rgba(18, 26, 43, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .signal-display-box {
+            background: rgba(8, 12, 22, 0.95);
+            border: 1px solid rgba(0, 191, 255, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .signal-title {
+            font-size: 0.75rem;
+            color: #9598a1;
+            margin-bottom: 5px;
+        }
+
+        .signal-action {
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+
+        .buy-color { color: #00ffcc; }
+        .neutral-color { color: #f0f3f6; }
+
+        .controls {
+            display: flex;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+
+        button:disabled {
+            background-color: #334155;
+            color: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-sim-signal {
+            background: linear-gradient(135deg, #00bfff, #0066ff);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 191, 255, 0.4);
+        }
+
+        .footer-note {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #9598a1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Environment -->
+    <div class="animated-bg"></div>
+    <div id="floating-emojis-container"></div>
+    <div class="neon-orb orb-1"></div>
+    <div class="neon-orb orb-2"></div>
+
+    <!-- Peeking Creature -->
+    <div class="peeking-creature" id="creature">
+        <div class="creature-eye eye-l"><div class="creature-pupil"></div></div>
+        <div class="creature-eye eye-r"><div class="creature-pupil"></div></div>
+        <div class="creature-smile"></div>
+    </div>
+
+    <!-- Main Dashboard Terminal -->
+    <div class="terminal-container">
+        <div class="header">
+            <h1>US500 200-Pip AI Sniper Bot (1H)</h1>
+            <div class="mt5-timer-box" id="mt5-timer">00:57:02</div>
+        </div>
+
+        <div class="content">
+            <div id="status-banner" class="status-banner status-scanning">
+                <span>Status: SCANNING 200-PIP SETUP</span>
+                <span id="state-badge">SEARCHING</span>
+            </div>
+
+            <div class="main-price-card">
+                <div>
+                    <div class="metric-label">US500 Index Price</div>
+                    <div class="metric-value" id="current-price" style="color: #00ffcc;">7,679.24</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="metric-label">Sniper Target</div>
+                    <div class="metric-value" style="color: #33d6ff;">+200 Pips 🎯</div>
+                </div>
+            </div>
+
+            <div class="grid-metrics">
+                <div class="metric-card">
+                    <div class="metric-label">Entry Price</div>
+                    <div class="metric-value" id="entry-value" style="color: #00bfff;">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Stop Loss (SL)</div>
+                    <div class="metric-value" id="sl-value" style="color: #ff3366;">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Take Profit (TP)</div>
+                    <div class="metric-value" id="tp-value" style="color: #00ffcc;">--</div>
+                </div>
+            </div>
+
+            <div class="signal-display-box">
+                <div class="signal-title">ACTIVE DISPLAY / TARGET</div>
+                <div class="signal-action neutral-color" id="signal-display">SCANNING FOR 200-PIP SNIPER ENTRY...</div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-sim-signal" id="scan-btn" onclick="triggerSniperEntry()">Scan & Lock 200-Pip Sniper Entry</button>
+            </div>
+
+            <div class="footer-note">
+                Saves state automatically. Won't reset or change when reloaded until TP or SL is hit.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Floating Emojis
+        const emojiList = ['📈', '🎯', '🚀', '⭐', '💎', '🔥', '💰'];
+        const emojiContainer = document.getElementById('floating-emojis-container');
+        for (let i = 0; i < 12; i++) {
+            let el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.innerText = emojiList[Math.floor(Math.random() * emojiList.length)];
+            el.style.left = Math.random() * 95 + 'vw';
+            el.style.animationDuration = (Math.random() * 4 + 4) + 's';
+            el.style.animationDelay = (Math.random() * 3) + 's';
+            emojiContainer.appendChild(el);
+        }
+
+        // Blinking Creature Effect
+        const creature = document.getElementById('creature');
+        setInterval(() => {
+            creature.classList.add('blinking');
+            setTimeout(() => creature.classList.remove('blinking'), 180);
+        }, 3500);
+
+        // Audio PIP Sound Effect
+        function playPipSound(isSuccess) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = isSuccess ? 'triangle' : 'sawtooth';
+                osc.frequency.setValueAtTime(isSuccess ? 900 : 250, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {
+                console.log("Audio requires user interaction");
+            }
+        }
+
+        // Persistent State Loading from Phone Memory
+        let inPosition = localStorage.getItem('us500_inPosition') === 'true';
+        let livePrice = parseFloat(localStorage.getItem('us500_livePrice')) || 7679.24;
+        let lockedEntry = parseFloat(localStorage.getItem('us500_lockedEntry')) || 0.00;
+        let stopLoss = parseFloat(localStorage.getItem('us500_stopLoss')) || 0.00;
+        let takeProfit = parseFloat(localStorage.getItem('us500_takeProfit')) || 0.00;
+
+        // Restore UI state if already in a locked trade
+        if (inPosition) {
+            applyLockedUI();
+        }
+
+        // Synchronized MT5 1H Candle Countdown
+        function updateMT5Countdown() {
+            const now = new Date();
+            let remainingMins = 59 - now.getMinutes();
+            let remainingSecs = 60 - now.getSeconds();
+            if (remainingSecs === 60) {
+                remainingSecs = 0;
+                remainingMins += 1;
+            }
+
+            const timerEl = document.getElementById('mt5-timer');
+            if (timerEl) {
+                timerEl.innerText = "00:" + String(remainingMins).padStart(2,'0') + ":" + String(remainingSecs).padStart(2,'0');
+            }
+        }
+        setInterval(updateMT5Countdown, 1000);
+        updateMT5Countdown();
+
+        // Live Price Ticker & Strict Boundary Checker
+        setInterval(() => {
+            let fluctuation = (Math.random() * 2 - 1).toFixed(2);
+            livePrice = parseFloat((livePrice + parseFloat(fluctuation)).toFixed(2));
+            localStorage.setItem('us500_livePrice', livePrice);
+
+            const priceEl = document.getElementById('current-price');
+            if (priceEl) priceEl.innerText = livePrice.toLocaleString();
+
+            if (inPosition) {
+                if (livePrice >= lockedEntry) {
+                    creature.classList.add('happy'); 
+                } else {
+                    creature.classList.remove('happy');
+                }
+
+                if (livePrice >= takeProfit) {
+                    playPipSound(true);
+                    triggerClose("🎯 200-PIP TAKE PROFIT HIT! Scan unlocked.");
+                } else if (livePrice <= stopLoss) {
+                    playPipSound(false);
+                    triggerClose("🛑 STOP LOSS HIT! Scan unlocked.");
+                }
+            }
+        }, 2000);
+
+        function triggerSniperEntry() {
+            if (inPosition) return;
+
+            inPosition = true;
+            lockedEntry = livePrice;
+            stopLoss = parseFloat((lockedEntry - 40.00).toFixed(2));     
+            takeProfit = parseFloat((lockedEntry + 200.00).toFixed(2));  
+
+            // Save state to local memory so reloading won't clear it
+            localStorage.setItem('us500_inPosition', 'true');
+            localStorage.setItem('us500_lockedEntry', lockedEntry);
+            localStorage.setItem('us500_stopLoss', stopLoss);
+            localStorage.setItem('us500_takeProfit', takeProfit);
+
+            applyLockedUI();
+        }
+
+        function applyLockedUI() {
+            let scanBtn = document.getElementById('scan-btn');
+            scanBtn.disabled = true;
+            scanBtn.innerText = "200-PIP TARGET LOCKED (HOLDING)";
+
+            let banner = document.getElementById('status-banner');
+            banner.className = "status-banner status-holding";
+            banner.children[0].innerText = "Status: 200-PIP TARGET LOCKED";
+            document.getElementById('state-badge').innerText = "HOLDING 200 PIPS";
+
+            document.getElementById('entry-value').innerText = lockedEntry.toLocaleString();
+            document.getElementById('sl-value').innerText = stopLoss.toLocaleString();
+            document.getElementById('tp-value').innerText = takeProfit.toLocaleString();
+
+            let signalBox = document.getElementById('signal-display');
+            signalBox.className = "signal-action buy-color";
+            signalBox.innerText = "HOLD LONG (Targeting +200 Pips)";
+        }
+
+        function triggerClose(message) {
+            inPosition = false;
+            creature.classList.remove('happy');
+
+            // Clear memory storage so fresh scan is ready
+            localStorage.removeItem('us500_inPosition');
+            localStorage.removeItem('us500_lockedEntry');
+            localStorage.removeItem('us500_stopLoss');
+            localStorage.removeItem('us500_takeProfit');
+
+            let signalBox = document.getElementById('signal-display');
+            signalBox.className = "signal-action neutral-color";
+            signalBox.innerText = message;
+
+            let banner = document.getElementById('status-banner');
+            banner.className = "status-banner status-scanning";
+            banner.children[0].innerText = "Status: SCANNING 200-PIP SETUP";
+            document.getElementById('state-badge').innerText = "SEARCHING";
+
+            document.getElementById('entry-value').innerText = "--";
+            document.getElementById('sl-value').innerText = "--";
+            document.getElementById('tp-value').innerText = "--";
+
+            let scanBtn = document.getElementById('scan-btn');
+            scanBtn.disabled = false;
+            scanBtn.innerText = "Scan & Lock Next 200-Pip Entry";
+        }
+    </script>
+</body>
+</html>
